@@ -1,0 +1,18 @@
+{
+  "name": "qqbot-ai-manager",
+  "version": "1.0.0",
+  "description": "QQ官方机器人AI管理平台 - 一键接入自定义AI模型",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "install-deps": "npm install"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "ws": "^8.18.0"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}

@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>安装 - QQBot AI 管理平台</title>
+<link rel="stylesheet" href="/style.css">
+<style>
+.install-wrap { min-height:100vh; display:-webkit-box; display:-ms-flexbox; display:flex; -webkit-box-align:center; -ms-flex-align:center; align-items:center; -webkit-box-pack:center; -ms-flex-pack:center; justify-content:center; padding:20px; background:#f5f5f5; }
+.install-box { background:#fff; border-radius:12px; padding:28px 22px; width:100%; max-width:420px; border:1px solid #eee; }
+.install-logo { text-align:center; margin-bottom:24px; }
+.install-logo h1 { font-size:22px; font-weight:800; color:#1a1a1a; margin-bottom:6px; }
+.install-logo p { font-size:12px; color:#999; }
+.install-step { display:none; }
+.install-step.active { display:block; }
+.step-indicator { display:-webkit-box; display:-ms-flexbox; display:flex; -webkit-box-pack:center; -ms-flex-pack:center; justify-content:center; gap:8px; margin-bottom:20px; }
+.step-dot { width:8px; height:8px; border-radius:50%; background:#ddd; -webkit-transition:all 0.3s; transition:all 0.3s; }
+.step-dot.active { background:#1a1a1a; width:24px; border-radius:4px; }
+.form-group { margin-bottom:14px; }
+.form-group label { display:block; font-size:12px; font-weight:600; margin-bottom:4px; color:#444; }
+.form-group input, .form-group textarea { width:100%; padding:9px 12px; border:1px solid #ddd; border-radius:7px; font-size:13px; font-family:inherit; background:#fff; color:#1a1a1a; -webkit-appearance:none; appearance:none; }
+.form-group input:focus, .form-group textarea:focus { outline:none; border-color:#1a1a1a; }
+.form-group textarea { min-height:100px; resize:vertical; line-height:1.5; }
+.form-group small { display:block; font-size:10px; color:#999; margin-top:4px; }
+.btn { display:inline-block; padding:9px 18px; border:none; border-radius:7px; font-size:13px; font-weight:600; cursor:pointer; text-decoration:none; line-height:1.4; -webkit-transition:opacity 0.15s; transition:opacity 0.15s; font-family:inherit; }
+.btn:hover { opacity:0.82; }
+.btn-primary { background:#1a1a1a; color:#fff; }
+.btn-outline { background:transparent; border:1px solid #ddd; color:#1a1a1a; }
+.btn-block { display:block; width:100%; text-align:center; }
+.alert { padding:10px 12px; border-radius:7px; font-size:12px; margin-bottom:12px; }
+.alert-error { background:#fff5f5; color:#dc3545; border:1px solid #fdd; }
+.alert-success { background:#f0fff4; color:#28a745; border:1px solid #dfd; }
+.welcome-icon { font-size:48px; text-align:center; margin-bottom:16px; }
+.feature-list { list-style:none; padding:0; margin:16px 0; }
+.feature-list li { padding:8px 0; font-size:13px; color:#555; border-bottom:1px solid #f5f5f5; }
+.feature-list li:last-child { border-bottom:none; }
+.feature-list li::before { content:"\2713"; color:#1a1a1a; font-weight:700; margin-right:8px; }
+.btn-row { display:-webkit-box; display:-ms-flexbox; display:flex; gap:8px; margin-top:16px; }
+.btn-row .btn { -webkit-box-flex:1; -ms-flex:1; flex:1; }
+</style>
+</head>
+<body>
+<div class="install-wrap">
+  <div class="install-box">
+    <div class="install-logo">
+      <h1>QQBot AI 管理平台</h1>
+      <p>一键接入自定义AI模型 · 多机器人统一管理</p>
+    </div>
+
+    <div class="step-indicator">
+      <div class="step-dot active" id="dot1"></div>
+      <div class="step-dot" id="dot2"></div>
+      <div class="step-dot" id="dot3"></div>
+    </div>
+
+    <!-- 步骤1：欢迎 -->
+    <div class="install-step active" id="step1">
+      <div class="welcome-icon">&#129302;</div>
+      <p style="text-align:center;font-size:13px;color:#666;margin-bottom:16px;">欢迎使用 QQBot AI 管理平台，几秒钟即可完成配置。</p>
+      <ul class="feature-list">
+        <li>支持 QQ 官方机器人一键接入</li>
+        <li>自定义 AI 模型（兼容 OpenAI 格式）</li>
+        <li>群聊 + 私聊上下文记忆</li>
+        <li>签到、抽奖等互动功能</li>
+        <li>黑白简约管理后台</li>
+      </ul>
+      <button class="btn btn-primary btn-block" onclick="nextStep(2)">开始安装</button>
+    </div>
+
+    <!-- 步骤2：基础配置 -->
+    <div class="install-step" id="step2">
+      <div class="form-group">
+        <label>管理员密码</label>
+        <input type="password" id="adminPassword" placeholder="请设置管理员密码" autocomplete="new-password">
+        <small>用于登录管理后台，用户名固定为 admin</small>
+      </div>
+      <div class="form-group">
+        <label>确认密码</label>
+        <input type="password" id="adminPassword2" placeholder="请再次输入密码" autocomplete="new-password">
+      </div>
+      <div class="form-group">
+        <label>服务端口</label>
+        <input type="number" id="port" value="3000" min="1" max="65535">
+        <small>默认 3000，可在宝塔/面板中反向代理到域名</small>
+      </div>
+      <div class="alert alert-error" id="error2" style="display:none;"></div>
+      <div class="btn-row">
+        <button class="btn btn-outline" onclick="nextStep(1)">上一步</button>
+        <button class="btn btn-primary" onclick="nextStep(3)">下一步</button>
+      </div>
+    </div>
+
+    <!-- 步骤3：完成 -->
+    <div class="install-step" id="step3">
+      <div class="form-group">
+        <label>默认系统提示词（可选）</label>
+        <textarea id="defaultPrompt" placeholder="留空则使用默认提示词。可设置机器人的人格、行为规则等。"></textarea>
+        <small>可在后台随时修改，所有机器人默认使用此提示词</small>
+      </div>
+      <div class="alert alert-error" id="error3" style="display:none;"></div>
+      <div class="btn-row">
+        <button class="btn btn-outline" onclick="nextStep(2)">上一步</button>
+        <button class="btn btn-primary" onclick="doInstall()">完成安装</button>
+      </div>
+    </div>
+
+    <!-- 安装成功 -->
+    <div class="install-step" id="stepDone">
+      <div class="welcome-icon" style="color:#28a745;">&#10003;</div>
+      <h3 style="text-align:center;margin-bottom:12px;color:#1a1a1a;">安装完成！</h3>
+      <div class="alert alert-success" id="successMsg" style="text-align:center;"></div>
+      <p style="text-align:center;font-size:12px;color:#999;margin:16px 0;">请记住以下信息，然后前往登录页添加机器人。</p>
+      <button class="btn btn-primary btn-block" onclick="location.href=\'/login.html\'">前往登录</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var currentStep = 1;
+function nextStep(n) {
+  if (n === 3) {
+    var p1 = document.getElementById(\'adminPassword\').value;
+    var p2 = document.getElementById(\'adminPassword2\').value;
+    var err = document.getElementById(\'error2\');
+    if (!p1 || p1.length < 6) { err.textContent = \'密码至少6位\'; err.style.display = \'block\'; return; }
+    if (p1 !== p2) { err.textContent = \'两次密码不一致\'; err.style.display = \'block\'; return; }
+    err.style.display = \'none\';
+  }
+  document.getElementById(\'step\'+currentStep).classList.remove(\'active\');
+  document.getElementById(\'dot\'+currentStep).classList.remove(\'active\');
+  currentStep = n;
+  document.getElementById(\'step\'+currentStep).classList.add(\'active\');
+  document.getElementById(\'dot\'+currentStep).classList.add(\'active\');
+}
+function doInstall() {
+  var err = document.getElementById(\'error3\');
+  err.style.display = \'none\';
+  var data = {
+    adminPassword: document.getElementById(\'adminPassword\').value,
+    port: parseInt(document.getElementById(\'port\').value) || 3000,
+    defaultPrompt: document.getElementById(\'defaultPrompt\').value
+  };
+  fetch(\'/api/install\', {method:\'POST\',headers:{\'Content-Type\':\'application/json\'},body:JSON.stringify(data)})
+  .then(function(r){return r.json().then(function(d){return {ok:r.ok,d:d};});})
+  .then(function(res){
+    if (res.ok && res.d.success) {
+      document.getElementById(\'step3\').classList.remove(\'active\');
+      document.getElementById(\'dot3\').classList.remove(\'active\');
+      document.getElementById(\'stepDone\').classList.add(\'active\');
+      document.getElementById(\'successMsg\').innerHTML = \'管理员用户名：admin<br>服务端口：\' + data.port + \'<br>请妥善保管密码\';
+    } else {
+      err.textContent = res.d.error || \'安装失败\';
+      err.style.display = \'block\';
+    }
+  })
+  .catch(function(){ err.textContent = \'网络错误\'; err.style.display = \'block\'; });
+}
+</script>
+</body>
+</html>

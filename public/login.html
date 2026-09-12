@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>登录 - QQBot 管理平台</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="login-wrap">
+  <div class="login-box">
+    <div class="login-logo">
+      <h1>QQBot 管理</h1>
+      <p>多机器人统一管理平台</p>
+    </div>
+    <div class="form-group">
+      <label>用户名</label>
+      <input type="text" id="username" value="admin" placeholder="admin">
+    </div>
+    <div class="form-group">
+      <label>密码</label>
+      <input type="password" id="password" placeholder="请输入密码">
+    </div>
+    <button class="btn btn-primary btn-block" onclick="doLogin()">登 录</button>
+    <div class="alert alert-error" id="error" style="display:none;margin-top:12px;"></div>
+  </div>
+</div>
+<script>
+function doLogin(){
+  var u=document.getElementById('username').value;
+  var p=document.getElementById('password').value;
+  var err=document.getElementById('error');
+  err.style.display='none';
+  fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})})
+  .then(function(r){return r.json().then(function(d){return {ok:r.ok,d:d};});})
+  .then(function(res){
+    if(res.ok&&res.d.token){localStorage.setItem('token',res.d.token);location.href='/';}
+    else{err.textContent=res.d.error||'登录失败';err.style.display='block';}
+  })
+  .catch(function(){err.textContent='网络错误';err.style.display='block';});
+}
+document.getElementById('password').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin();});
+</script>
+</body>
+</html>
