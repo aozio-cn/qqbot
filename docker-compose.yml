@@ -1,0 +1,19 @@
+version: "3.8"
+
+services:
+  qqbot:
+    build: .
+    image: qqbot-ai-manager:20261006
+    container_name: qqbot
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      # 机器人配置 / 对话数据持久化（请先 mkdir -p data "chat history"）
+      - ./data:/app/data
+      - ./chat_history:/app/chat history
+      # 点歌音频缓存（可选，播后即删）
+      - ./public/music_cache:/app/public/music_cache
+    environment:
+      - PORT=3000
+      - NODE_ENV=production

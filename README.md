@@ -219,6 +219,19 @@ systemctl enable qqbot
 systemctl start qqbot
 ```
 
+### 方法四：Docker 部署（推荐）
+
+免装 Node 环境，一条命令起服务，数据持久化在主机目录：
+
+```bash
+git clone https://github.com/aozio-cn/qqbot.git
+cd qqbot
+mkdir -p data "chat history" public/music_cache
+docker compose up -d --build
+```
+
+启动后访问 `http://服务器IP:3000/` 完成安装向导。数据目录（`data/`、`chat history/`、`public/music_cache/`）已挂载到主机，容器重建 / 升级不丢数据。完整说明见 [`DOCKER.md`](DOCKER.md)。
+
 ## 安装向导
 
 首次访问 `http://你的IP:3000/` 会自动跳转到安装页面：

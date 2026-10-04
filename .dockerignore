@@ -1,0 +1,12 @@
+# 运行时数据与敏感配置不入镜像
+data/
+chat history/
+public/music_cache/
+node_modules/
+.git/
+*.zip
+*.log
+.gitignore
+README.md
+DOCKER.md
+更新说明.nmb
