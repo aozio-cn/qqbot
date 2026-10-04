@@ -155,3 +155,17 @@ img { max-width:100%; height:auto; }
 .chat-record-content { font-size:12px; color:#333; line-height:1.6; word-break:break-all; }
 .chat-record-content.user { color:#1a1a1a; }
 .chat-record-content.assistant { color:#555; }
+
+/* ===== 勾选框（功能开关） ===== */
+.check-group { display:-webkit-box; display:-ms-flexbox; display:flex; -webkit-box-orient:vertical; -webkit-box-direction:normal; -ms-flex-direction:column; flex-direction:column; gap:10px; margin-top:6px; }
+.check-row { display:-webkit-box; display:-ms-flexbox; display:flex; -webkit-box-align:center; -ms-flex-align:center; align-items:center; gap:10px; cursor:pointer; font-size:13px; color:#333; }
+.check-row input[type="checkbox"] { width:18px; height:18px; -webkit-appearance:none; -moz-appearance:none; appearance:none; border:2px solid #cbd5e1; border-radius:4px; background:#fff; cursor:pointer; position:relative; -webkit-box-flex:0; -ms-flex-positive:0; flex-grow:0; -ms-flex-negative:0; flex-shrink:0; -webkit-transition:background 0.2s,border-color 0.2s; transition:background 0.2s,border-color 0.2s; }
+.check-row input[type="checkbox"]:checked { background:#16a34a; border-color:#16a34a; }
+.check-row input[type="checkbox"]:checked::after { content:''; position:absolute; left:4px; top:0; width:5px; height:10px; border:solid #fff; border-width:0 2px 2px 0; -webkit-transform:rotate(45deg); transform:rotate(45deg); }
+
+/* ===== 指令/菜单页 ===== */
+.cmd-feature { background:#fafafa; border:1px solid #eee; border-radius:8px; padding:8px 12px; margin-bottom:8px; }
+.cmd-menu-box { background:#f8f9fa; border:1px dashed #ccc; border-radius:8px; padding:14px 16px; font-size:13px; line-height:1.8; color:#333; white-space:pre-wrap; }
+
+/* 其他机器人消息：名字徽章浅粉 */
+.badge-bot { background:#ffe4e6; color:#db2777; }

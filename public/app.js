@@ -48,12 +48,14 @@ function showPage(page){
   document.getElementById('page-chats').style.display=page==='chats'?'block':'none';
   document.getElementById('page-commands').style.display=page==='commands'?'block':'none';
   document.getElementById('page-msgrecv').style.display=page==='msgrecv'?'block':'none';
+  document.getElementById('page-music').style.display=page==='music'?'block':'none';
   var links=document.querySelectorAll('.sidebar-menu a');
   for(var i=0;i<links.length;i++)links[i].className='';
   toggleSidebar();
   if(page==='chats')loadChatBots();
   if(page==='commands')loadCmdBots();
   if(page==='msgrecv')loadMsgRecvPage();
+  if(page==='music')loadMusicPage();
 }
 
 // 对话功能开关：未勾选时隐藏 api/key/模型/提示词，但保留已填内容
@@ -162,7 +164,7 @@ function openAddModal(){
   document.getElementById('botAppId').value='';
   document.getElementById('botAppSecret').value='';
   document.getElementById('botPrompt').value='你是一个友好的AI助手。';
-  document.getElementById('botApiUrl').value='https://your-api.example.com/v1/chat/completions';
+  document.getElementById('botApiUrl').value='https://aapi.aozio.cn/api/relay.php';
   document.getElementById('botApiKey').value='sk-aapi-5d0e4cf82f7e4ac6e887ec8b3b1c4bb0';
   document.getElementById('botModel').value='acu/deepseek-v4-flash';
   document.getElementById('botEnableConversation').checked=true;
@@ -272,7 +274,7 @@ function loadCmdConfig(){
     // Ping 接口配置（可选，留空则 ping 指令不可用）
     html+='<div class="form-group"><label>Ping 接口（可选，留空则 ping 指令不可用）</label>'+
       '<div class="form-row">'+
-        '<div class="form-group"><label>接口地址</label><input type="text" id="cmdPingApiUrl" value="'+esc(b.pingApiUrl||'')+'" placeholder="例如：https://your-ping.example.com/api_ping.php"></div>'+
+        '<div class="form-group"><label>接口地址</label><input type="text" id="cmdPingApiUrl" value="'+esc(b.pingApiUrl||'')+'" placeholder="例如：https://ping.aozio.cn/api_ping.php"></div>'+
         '<div class="form-group"><label>API 密钥</label><input type="text" id="cmdPingApiKey" value="'+esc(b.pingApiKey||'')+'" placeholder="自建接口时自行设置的密钥"></div>'+
       '</div>'+
       '<div class="cmd-menu-box" style="font-size:11px;color:#666;margin-top:6px;">请求方式：POST 到上方“接口地址”。<br>请求头：Content-Type: application/json；X-API-Key：上方“API 密钥”。<br>请求体：{"target":"要ping的地址"}。<br>返回：{"result":"ping输出文本","success":true/false}；出错时返回 {"error":"错误信息"}。<br>留空时 /ping 指令会提示“接口未配置”，方便自建接口后自行填写。</div>'+
@@ -348,6 +350,64 @@ function saveMsgRecvPage(){
     })(radios[i].getAttribute('data-id'),radios[i].value);
   }
   p.then(function(){showToast(saved>0?('保存成功('+saved+' 个机器人)'):'保存失败','');});
+}
+
+function loadMusicPage(){
+  api('/bots').then(function(res){
+    if(!res.ok)return;
+    var bots=res.d.bots;
+    if(!bots.length){document.getElementById('musicConfig').innerHTML='<div class="empty"><p>暂无机器人</p></div>';return;}
+    var html='<div class="form-group"><label>选择机器人</label><select id="mcBotSelect" onchange="loadBotMusicConfig()">';
+    bots.forEach(function(b){
+      html+='<option value="'+b.id+'">'+esc(b.name)+'</option>';
+    });
+    html+='</select></div><div id="mcBotConfig" style="margin-top:12px;"></div>';
+    document.getElementById('musicConfig').innerHTML=html;
+    loadBotMusicConfig();
+  });
+}
+function loadBotMusicConfig(){
+  var id=document.getElementById('mcBotSelect').value;
+  if(!id){document.getElementById('mcBotConfig').innerHTML='';return;}
+  api('/bots/'+id).then(function(res){
+    if(!res.ok||!res.d.bot){document.getElementById('mcBotConfig').innerHTML='';return;}
+    var b=res.d.bot;
+    var enabled=b.musicEnabled!==false;
+    var active=b.musicActive||'netease';
+    var apiBase=b.neteaseApi||'https://api.2leo.top';
+    var html='';
+    html+='<label class="check-row" style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">'+
+      '<input type="checkbox" id="mcEnabled" '+(enabled?'checked':'')+'> <span style="font-weight:600;">该机器人启用点歌</span></label>';
+    html+='<div style="font-weight:600;margin:12px 0 8px;">音乐平台</div>';
+    html+='<div class="check-group">';
+    html+='<label class="check-row" style="display:flex;align-items:center;gap:8px;"><input type="radio" name="mcActive" value="netease"'+(active==='netease'?' checked':'')+'> <span>网易云</span></label>';
+    html+='<label class="check-row" style="display:flex;align-items:center;gap:8px;"><input type="radio" name="mcActive" value="kugou"'+(active==='kugou'?' checked':'')+'> <span>酷狗（曲库全，海外可下载）</span></label>';
+    html+='<label class="check-row" style="display:flex;align-items:center;gap:8px;"><input type="radio" name="mcActive" value="deezer"'+(active==='deezer'?' checked':'')+'> <span>Deezer（国际曲库）</span></label>';
+    html+='</div>';
+    html+='<div style="font-weight:600;margin:18px 0 8px;">网易云第三方接口</div>';
+    var presets=['https://api.2leo.top','https://api.7boe.top'];
+    if(presets.indexOf(apiBase)<0)presets.push(apiBase);
+    var apiOpts='';
+    presets.forEach(function(p){apiOpts+='<option value="'+esc(p)+'"'+(p===apiBase?' selected':'')+'>'+esc(p)+'</option>';});
+    html+='<div style="font-size:11px;color:#999;margin-bottom:4px;">选择一个接口（需支持 /search 与 /song/url/v1）。一个不可用时切换另一个。</div>';
+    html+='<div class="form-group"><label>接口地址</label><select id="mcApiBase">'+apiOpts+'</select></div>';
+    html+='<button class="btn btn-primary" style="margin-top:16px;" onclick="saveMusicConfigPage()">保存</button>';
+    html+='<div style="margin-top:14px;padding:12px;background:#e8f0fe;border-radius:6px;color:#333;font-size:13px;line-height:1.8;">'+
+      '<b>使用方法：</b>群里发「点歌 歌名」搜索（每页10首）；「点歌 歌名 2」翻到第2页（第1首序号为11）；发「播放 序号」点播，机器人以语音消息把歌曲发进群。</div>';
+    document.getElementById('mcBotConfig').innerHTML=html;
+  });
+}
+function saveMusicConfigPage(){
+  var id=document.getElementById('mcBotSelect').value;
+  if(!id)return;
+  var enabled=document.getElementById('mcEnabled').checked;
+  var activeEl=document.querySelector('input[name="mcActive"]:checked');
+  var active=activeEl?activeEl.value:'netease';
+  var apiBase=(document.getElementById('mcApiBase').value||'').trim()||'https://api.2leo.top';
+  api('/bots/'+id,{method:'PUT',body:JSON.stringify({musicEnabled:enabled,musicActive:active,neteaseApi:apiBase})}).then(function(res){
+    if(res.ok){showToast('已保存');loadBotMusicConfig();}
+    else{showToast(res.d.error||'保存失败','error');}
+  });
 }
 
 function saveCmdConfig(){

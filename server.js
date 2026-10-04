@@ -131,7 +131,9 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), {
+  setHeaders: (res) => { res.setHeader('Cache-Control', 'no-cache'); }
+}));
 
 // ========== API路由 ==========
 
@@ -203,8 +205,8 @@ app.post('/api/bots', authMiddleware, (req, res) => {
   const newBot = {
     id, name, appId, appSecret,
     systemPrompt: systemPrompt || '你是一个友好的AI助手。',
-    apiUrl: apiUrl || 'https://your-api.example.com/v1/chat/completions',
-    apiKey: apiKey || '''',
+    apiUrl: apiUrl || 'https://aapi.aozio.cn/api/relay.php',
+    apiKey: apiKey || 'sk-aapi-5d0e4cf82f7e4ac6e887ec8b3b1c4bb0',
     model: model || 'acu/deepseek-v4-flash',
     enableConversation: enableConversation !== false,
     enableQuickCommands: enableQuickCommands !== false,

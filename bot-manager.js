@@ -1,6 +1,7 @@
 // bot-manager.js - QQ官方机器人多实例管理（WebSocket接入 + 私聊/群聊）
 const WebSocket = require('ws');
 const https = require('https');
+const http = require('http');
 const fs = require('fs');
 // 禁用console.log，只保留console.error
 console.log = function() {};
@@ -180,7 +181,7 @@ function parseReplyMarker(raw) {
   if (t.startsWith('[no]')) return { send: false, content: '', adList, gagList, ungagList };
   if (t.startsWith('[yes]')) return { send: true, content: strip(t.slice(5)), adList, gagList, ungagList };
   // 兼容模型未严格按格式：整条回复仅是"不回复"标记（no / (no) / [no] / （no） 等，忽略大小写、空白与中英文括号/句点）→ 视为不发送
-  if (/^(?:[(\[\uFF08]\s*)?no(?:\s*[)\]\uFF09]|[\s.。!?！？]*)$/i.test(strip(t))) return { send: false, content: '', adList, gagList, ungagList };
+  if (/^(?:[(\[\uFF08\u3010]\s*)?no(?:\s*[)\]\uFF09\u3011]|[\s.。!?！？]*)$/i.test(strip(t))) return { send: false, content: '', adList, gagList, ungagList };
   // 无标记：默认发送原文（剥前缀）
   return { send: true, content: strip(t), adList, gagList, ungagList };
 }
@@ -629,7 +630,8 @@ const CMD_FEATURE = {
   '/关于': '关于', '/关于我': '关于', '/你是谁': '关于',
   '/清除上下文': '清除上下文', '/清空': '清除上下文', '/清除记忆': '清除上下文', '/重置': '清除上下文',
   '/ping': 'ping',
-  '/天气': '天气', '/weather': '天气', '/查天气': '天气'
+  '/天气': '天气', '/weather': '天气', '/查天气': '天气',
+  '/点歌': '点歌'
 };
 
 async function handleCommand(content, userInfo, args, botConfig) {
@@ -650,6 +652,8 @@ async function handleCommand(content, userInfo, args, botConfig) {
     case '/帮助':
     case '/help':
       return buildMenuText(botConfig);
+    case '/点歌':
+      return '🎵 **点歌功能**\n\n点歌：发「点歌 歌名」搜索（每页10首）\n翻页：发「点歌 歌名 2」\n播放：发「播放 序号」，机器人以语音把歌曲发进群\n\n管理（需@我）：\n· @我 点歌 开 / 关 —— 开关本群点歌\n· @我 点歌平台 酷狗 / 网易 / Deezer —— 切换本群音乐平台';
     case '/今日运势':
     case '/运势':
     case '/运气':
@@ -806,6 +810,7 @@ const MENU_ITEM_DEFS = [
   { feature: '清除上下文', name: '清除上下文', cmd: '/清除上下文', desc: '清空对话记忆' },
   { feature: '任务列表', name: '任务列表', cmd: '/任务列表', desc: '任务/功能开关列表' },
   { feature: '天气', name: '天气', cmd: '/天气', desc: '查询城市天气' },
+  { feature: '点歌', name: '点歌', cmd: '/点歌', desc: '点歌搜歌（点歌+歌名，播放+序号）' },
   { feature: 'ping', name: 'ping', cmd: '/ping', desc: '网络连通检测' }
 ];
 const OUR_CMD_NAMES = new Set(MENU_ITEM_DEFS.map(d => d.name).concat(['菜单', '帮助']));
@@ -907,6 +912,22 @@ function loadAdGuard() { try { return JSON.parse(fs.readFileSync(ADS_FILE, 'utf8
 function saveAdGuard(store) { try { fs.writeFileSync(ADS_FILE, JSON.stringify(store, null, 2)); } catch (e) {} }
 function adGuardEnabled(bot, gid) { const s = loadAdGuard(); return !!((s[bot.id] || {})[gid || '__private__']); }
 
+// 按群音乐配置：data/music_group.json，结构 { [botId]: { [gid]: { enabled, active, neteaseApi } } }，覆盖 web 后台默认配置
+const MUSIC_GROUP_FILE = path.join(__dirname, 'data', 'music_group.json');
+function loadMusicGroupCfg() { try { return JSON.parse(fs.readFileSync(MUSIC_GROUP_FILE, 'utf8')); } catch (e) { return {}; } }
+function saveMusicGroupCfg(store) { try { fs.writeFileSync(MUSIC_GROUP_FILE, JSON.stringify(store, null, 2)); } catch (e) {} }
+function getMusicGroupCfg(botId, gid) { const s = loadMusicGroupCfg(); return ((s[botId] || {})[gid || '__private__']) || null; }
+function setMusicGroupCfg(botId, gid, patch) { const s = loadMusicGroupCfg(); s[botId] = s[botId] || {}; s[botId][gid || '__private__'] = Object.assign({}, s[botId][gid || '__private__'], patch); saveMusicGroupCfg(s); }
+// 按群音乐配置合并成生效配置（群配置优先，回退到 web 后台默认）
+function buildMusicCfg(bot, groupInfo) {
+  const gc = (groupInfo && groupInfo.groupId) ? getMusicGroupCfg(bot.config.id, groupInfo.groupId) : null;
+  return Object.assign({}, bot.config, {
+    musicEnabled: (gc && gc.enabled !== undefined) ? gc.enabled : (bot.config.musicEnabled !== false),
+    musicActive: (gc && gc.active) || bot.config.musicActive || 'netease',
+    neteaseApi: (gc && gc.neteaseApi && String(gc.neteaseApi).trim()) || bot.config.neteaseApi || 'https://api.2leo.top'
+  });
+}
+
 // 生成"链接式"指令按钮（markdown <qqbot-cmd-input>：点击后输入框自动@机器人+指令，手动发送，无需申请权限）
 function buildCmdInputRow(botConfig, botName) {
   const cmds = (botConfig && botConfig.commands) || {};
@@ -996,7 +1017,7 @@ function buildMenuText(botConfig) {
   const isOn = (k) => cmds[k] !== false;
   const lines = ['**—— 指令菜单 ——**\n'];
   if (bottomOn) {
-    const enabled = ['今日运势', '签到', '抽签', '笑话', '掷骰子', '关于', '天气', '清除上下文'].filter(isOn);
+    const enabled = ['今日运势', '签到', '抽签', '笑话', '掷骰子', '关于', '天气', '清除上下文', '点歌'].filter(isOn);
     if (enabled.length === 0) {
       lines.push('· 暂无可用指令');
     } else {
@@ -1943,7 +1964,7 @@ class BotInstance {
       return;
     }
 
-    // 记录群聊上下文（所有文本消息，让机器人"知道每个人发过什么"）
+    // 记录群聊上下文（所有文本消息，让机器人"知道每个人发过什么"）——点歌/播放指令也记录进上下文（AI 可见），但点歌指令本身不会触发 AI 对话回复
     if (rawContent && rawContent.trim()) {
       const groupCtx = loadGroupContext(this.config.id, groupInfo);
       groupCtx.push({ role: 'user', content: prettyMentions(this, rawContent.trim()), time: nowTime(), userName: userInfo.nickname, openid: userInfo.openid, isBot: userInfo.isBot, msgId: event.id });
@@ -1952,6 +1973,9 @@ class BotInstance {
       learnFromMessage(this.config.id, userInfo, rawContent.trim());
     }
     
+    // 点歌功能（点歌/播放）——点歌/播放是唯一不用艾特的指令（未被@也可响应），需放在"是否回复决策"之前
+    try { const mh = await handleMusicCmd(this, content, userInfo, groupInfo, msgId, hasMention); if (mh) return; } catch (e) { console.error('[' + this.config.name + '] 点歌指令异常: ' + e.message); }
+
     // ---- 是否回复决策：被@/叫名字 → 必回；否则若开启伪人自主回复且通过冷却 → 进入 AI 判断 ----
     const autoReply = this.config.enableAutoReply !== false; // 伪人自主回复开关（默认开启）
     let shouldReply = hasMention || hasNamePrefix;
@@ -3360,6 +3384,192 @@ async function handlePing(message, userInfo, botConfig) {
 }
 
 module.exports = { BotManager };
+
+// ========== 点歌功能（网易云/Deezer 第三方接口，配置随每个机器人保存） ==========
+function fmtDur(sec) { sec = Math.round(sec || 0); const m = Math.floor(sec / 60), s = sec % 60; return m + ':' + (s < 10 ? '0' + s : s); }
+function httpGetText(url) {
+  return new Promise((resolve, reject) => {
+    let mod = https, u;
+    try { u = new URL(url); if (u.protocol === 'http:') mod = http; } catch (e) { return reject(e); }
+    const hd = { 'User-Agent': 'Mozilla/5.0' };
+    if (u.protocol === 'https:') hd['Referer'] = 'https://www.bilibili.com';
+    const req = mod.get(u, { headers: hd }, (res) => {
+      if (res.statusCode >= 400) { reject(new Error('HTTP ' + res.statusCode)); res.resume(); return; }
+      let d = ''; res.setEncoding('utf8'); res.on('data', c => d += c); res.on('end', () => resolve(d));
+    });
+    req.on('error', reject); req.setTimeout(20000, () => req.destroy(new Error('请求超时')));
+  });
+}
+async function httpGetJson(url) { return JSON.parse(await httpGetText(url)); }
+function httpGetBuffer(url, extraHeaders) {
+  return new Promise((resolve, reject) => {
+    let mod = https, u;
+    try { u = new URL(url); if (u.protocol === 'http:') mod = http; } catch (e) { return reject(e); }
+    const hd = { 'User-Agent': 'Mozilla/5.0' };
+    if (extraHeaders) Object.assign(hd, extraHeaders);
+    else if (u.protocol === 'https:') hd['Referer'] = 'https://www.bilibili.com';
+    let started = false, settled = false, firstByteTimer = null, totalTimer = null;
+    const cleanup = () => { if (firstByteTimer) clearTimeout(firstByteTimer); if (totalTimer) clearTimeout(totalTimer); };
+    const fail = (err) => { if (settled) return; settled = true; cleanup(); reject(err); };
+    const done = (buf) => { if (settled) return; settled = true; cleanup(); resolve(buf); };
+    // 10 秒内未开始下载（未收到任何数据）→ 直接请求失败，不干等
+    firstByteTimer = setTimeout(() => fail(new Error('请求失败：10秒内未开始下载')), 10000);
+    const req = mod.get(u, { headers: hd }, (res) => {
+      if (res.statusCode >= 400) { res.resume(); fail(new Error('HTTP ' + res.statusCode)); return; }
+      const chunks = [];
+      res.on('data', c => {
+        if (!started) {
+          started = true;
+          clearTimeout(firstByteTimer);
+          totalTimer = setTimeout(() => fail(new Error('下载超时')), 60000); // 已开始下载 → 给足 60 秒
+        }
+        chunks.push(c);
+      });
+      res.on('end', () => done(Buffer.concat(chunks)));
+    });
+    req.on('error', (e) => fail(new Error('请求失败: ' + e.message)));
+  });
+}
+async function searchNetease(apiBase, keyword, page) {
+  const limit = 10, offset = (page - 1) * 10;
+  const d = await httpGetJson(apiBase + '/search?keywords=' + encodeURIComponent(keyword) + '&limit=' + limit + '&offset=' + offset);
+  const songs = (d.result && d.result.songs) || [];
+  return { total: (d.result && (d.result.songCount || songs.length)) || 0, list: songs.map(s => ({
+    id: s.id, name: s.name, artist: ((s.artists || []).map(a => a.name).join('/')) || (s.artistsText || ''), duration: Math.round((s.duration || 0) / 1000), source: 'netease'
+  })) };
+}
+async function neteasePlayUrl(apiBase, id) {
+  const d = await httpGetJson(apiBase + '/song/url/v1?id=' + id + '&level=exhigh');
+  const arr = (d.data || []); return (arr[0] && arr[0].url) || null;
+}
+async function searchDeezer(keyword, page) {
+  const d = await httpGetJson('https://api.deezer.com/search?q=' + encodeURIComponent(keyword) + '&limit=10&index=' + ((page - 1) * 10));
+  return { total: d.total || 0, list: (d.data || []).map(s => ({ id: s.id, name: s.title, artist: (s.artist && s.artist.name) || '', duration: s.duration || 0, preview: s.preview, source: 'deezer' })) };
+}
+async function searchKugou(keyword, page) {
+  const limit = 10;
+  let songs = null, total = 0;
+  for (let i = 0; i < 3; i++) {
+    try {
+      const d = await httpGetJson('https://songsearch.kugou.com/song_search_v2?keyword=' + encodeURIComponent(keyword) + '&page=' + page + '&pagesize=' + limit);
+      songs = (d && d.data && d.data.lists) || []; total = (d && d.data && d.data.total) || 0;
+    } catch (e) { songs = null; }
+    if (songs && songs.length) break;
+    await new Promise(r => setTimeout(r, 1500));
+  }
+  if (!songs || !songs.length) return { total: 0, list: [] };
+  return { total: total || songs.length, list: songs.map(s => ({
+    id: s.HQFileHash || s.FileHash || s.hash, name: s.SongName || s.FileName || s.songname || '',
+    artist: s.SingerName || s.singername || '', duration: Math.round((s.Duration || s.duration || 0) / 1000), source: 'kugou'
+  })).filter(x => x.id && x.name) };
+}
+async function kugouPlayUrl(hash) {
+  const d = await httpGetJson('https://m.kugou.com/app/i/getSongInfo.php?cmd=playInfo&hash=' + hash);
+  return (d && d.url) || null;
+}
+async function searchMusic(cfg, keyword, page) {
+  const platform = (cfg && (cfg.musicActive || cfg.active)) || 'netease';
+  if (platform === 'deezer') return await searchDeezer(keyword, page);
+  if (platform === 'kugou') return await searchKugou(keyword, page);
+  const apiBase = (cfg && cfg.neteaseApi && String(cfg.neteaseApi).trim()) || 'https://api.2leo.top';
+  return await searchNetease(apiBase, keyword, page);
+}
+function cleanupMusicCache(dir) {
+  try { const files = fs.readdirSync(dir); if (files.length > 50) { const sorted = files.map(f => ({ f, t: fs.statSync(path.join(dir, f)).mtimeMs })).sort((a, b) => a.t - b.t); for (let i = 0; i < sorted.length - 30; i++) { try { fs.unlinkSync(path.join(dir, sorted[i].f)); } catch (e) {} } } } catch (e) {}
+}
+async function downloadAndServe(audioUrl, extraHeaders) {
+  const dir = path.join(__dirname, 'public', 'music_cache');
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  const fn = 'm_' + Date.now() + '_' + Math.floor(Math.random() * 1e6) + '.mp3';
+  let data = null, lastErr = null;
+  for (let att = 0; att < 2; att++) { try { data = await httpGetBuffer(audioUrl, extraHeaders); break; } catch (e) { lastErr = e; await new Promise(r => setTimeout(r, 800)); } }
+  if (!data) throw new Error('下载失败: ' + (lastErr && lastErr.message));
+  fs.writeFileSync(path.join(dir, fn), data);
+  cleanupMusicCache(dir);
+  // 站点公网地址（语音文件由 QQ 服务器下载）；部署到其它域名时请改成对应域名
+  return 'https://qqbot.aozio.cn/music_cache/' + fn;
+}
+async function sendGroupAudio(bot, groupId, audioUrl) {
+  const token = await bot.getAccessToken();
+  const upBody = JSON.stringify({ file_type: 3, url: audioUrl, srv_send_msg: false });
+  const up = await httpsRequest({ hostname: 'api.sgroup.qq.com', path: '/v2/groups/' + groupId + '/files', method: 'POST', headers: { 'Authorization': 'QQBot ' + token, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(upBody) } }, upBody);
+  if (up.status !== 200) throw new Error('上传语音失败 ' + up.status + ' ' + JSON.stringify(up.data).substring(0, 80));
+  const fileInfo = up.data.file_info;
+  const msgBody = JSON.stringify({ content: ' ', msg_type: 7, media: { file_info: fileInfo } });
+  const res = await httpsRequest({ hostname: 'api.sgroup.qq.com', path: '/v2/groups/' + groupId + '/messages', method: 'POST', headers: { 'Authorization': 'QQBot ' + token, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(msgBody) } }, msgBody);
+  if (res.status !== 200) throw new Error('发送语音失败 ' + res.status + ' ' + JSON.stringify(res.data).substring(0, 80));
+  return res.data;
+}
+async function playOne(bot, item, groupInfo, userInfo, msgId, mcfg) {
+  try {
+    await bot.sendGroupMessage(groupInfo.groupId, '⏳ 正在准备播放《' + item.name + '》...', msgId, null, userInfo.openid);
+    let audioUrl, dlHeaders;
+    if (item.source === 'deezer') audioUrl = item.preview;
+    else if (item.source === 'kugou') { audioUrl = await kugouPlayUrl(item.id); dlHeaders = { 'Referer': 'https://www.kugou.com', 'Range': 'bytes=0-' }; }
+    else { const m2 = mcfg || bot.config || {}; audioUrl = await neteasePlayUrl(m2.neteaseApi, item.id); }
+    if (!audioUrl) throw new Error('无法获取播放地址，请更换音乐接口后重试');
+    const mp3Url = await downloadAndServe(audioUrl, dlHeaders);
+    await sendGroupAudio(bot, groupInfo.groupId, mp3Url);
+  } catch (e) { console.error('[' + bot.config.name + '] 播放失败: ' + e.message); try { await bot.sendGroupMessage(groupInfo.groupId, '🎵 播放失败：' + e.message, msgId, null, userInfo.openid); } catch (e2) {} }
+}
+async function handleMusicCmd(bot, content, userInfo, groupInfo, msgId, hasMention) {
+  try {
+    const mcfg = buildMusicCfg(bot, groupInfo); // 按群音乐配置优先，回退到 web 后台默认
+    if (mcfg.musicEnabled === false) return false;
+    // 点歌管理指令（需艾特机器人）：点歌 开/关、点歌平台 xxx、点歌（帮助）——放在搜索前拦截，避免当作关键词搜索
+    const mOpen = content.match(/^点歌\s*(开|关)\s*$/);
+    const mPlat = content.match(/^点歌平台\s*([\S]+)\s*$/);
+    const mHelp = /^点歌\s*$/.test(content);
+    if (mOpen || mPlat || mHelp) {
+      if (!hasMention) return true; // 管理指令需艾特；未艾特时不执行，也不当作搜索
+      if (mOpen) {
+        const on = mOpen[1] === '开';
+        setMusicGroupCfg(bot.config.id, groupInfo.groupId, { enabled: on });
+        await bot.sendGroupMessage(groupInfo.groupId, '✅ 本群点歌功能已' + (on ? '开启' : '关闭') + (on ? '～发「点歌 歌名」搜歌、「播放 序号」点播~' : ''), msgId, null, userInfo.openid);
+        return true;
+      }
+      if (mPlat) {
+        const p = mPlat[1].trim().toLowerCase();
+        const map = { '网易': 'netease', '网易云': 'netease', 'netease': 'netease', '酷狗': 'kugou', 'kugou': 'kugou', 'deezer': 'deezer', '国际': 'deezer' };
+        const act = map[p];
+        if (!act) { await bot.sendGroupMessage(groupInfo.groupId, '🎵 支持的平台：网易 / 酷狗 / Deezer（例：@我 点歌平台 酷狗）', msgId, null, userInfo.openid); return true; }
+        setMusicGroupCfg(bot.config.id, groupInfo.groupId, { active: act });
+        await bot.sendGroupMessage(groupInfo.groupId, '✅ 本群音乐平台已切换为「' + p + '」', msgId, null, userInfo.openid);
+        return true;
+      }
+      if (mHelp) {
+        await bot.sendGroupMessage(groupInfo.groupId, '🎵 **点歌功能**\n\n点歌：发「点歌 歌名」搜索（每页10首）\n翻页：发「点歌 歌名 2」\n播放：发「播放 序号」，机器人以语音把歌曲发进群\n\n管理（需@我）：\n· @我 点歌 开 / 关 —— 开关本群点歌\n· @我 点歌平台 酷狗 / 网易 / Deezer —— 切换本群音乐平台', msgId, null, userInfo.openid);
+        return true;
+      }
+    }
+    const order = content.match(/^点歌\s*([\s\S]+?)(?:\s+(\d+))?$/);
+    const play = content.match(/^播放\s*(\d+)\s*$/);
+    if (order) {
+      const keyword = String(order[1]).trim(); if (!keyword) return false;
+      const page = Math.max(1, parseInt(order[2], 10) || 1);
+      const res = await searchMusic(mcfg, keyword, page);
+      if (!res || !res.list || !res.list.length) { await bot.sendGroupMessage(groupInfo.groupId, '🔍 没有找到「' + keyword + '」的歌曲，换个关键词试试~', msgId, null, userInfo.openid); return true; }
+      bot.musicCache = { keyword, page, list: res.list, total: res.total || 0, time: Date.now() };
+      const start = (page - 1) * 10 + 1, totalPages = Math.max(1, Math.ceil((res.total || 0) / 10));
+      let text = '🎵 **点歌·' + keyword + '**（第' + page + '页 / 共' + totalPages + '页）\n\n';
+      res.list.forEach((m, i) => { text += start + i + '. ' + m.name + ' - ' + m.artist + (m.duration ? '（' + fmtDur(m.duration) + '）' : '') + '\n'; });
+      text += '\n回复「播放序号」点歌，如：播放' + start;
+      if (page < totalPages) text += '\n翻页：点歌 ' + keyword + ' ' + (page + 1);
+      await bot.sendGroupMessage(groupInfo.groupId, text, msgId, null, userInfo.openid);
+      return true;
+    }
+    if (play) {
+      const idx = parseInt(play[1], 10);
+      const cache = bot.musicCache;
+      if (!cache || !cache.list || !cache.list.length) { await bot.sendGroupMessage(groupInfo.groupId, '🎵 请先发「点歌 歌名」搜索歌曲，再发「播放序号」点播~', msgId, null, userInfo.openid); return true; }
+      const item = cache.list[idx - 1];
+      if (!item) { await bot.sendGroupMessage(groupInfo.groupId, '🎵 没有序号 ' + idx + '，请在列表范围内选择~', msgId, null, userInfo.openid); return true; }
+      await playOne(bot, item, groupInfo, userInfo, msgId, mcfg);
+      return true;
+    }
+    return false;
+  } catch (e) { console.error('[' + bot.config.name + '] 点歌处理异常: ' + e.message); try { await bot.sendGroupMessage(groupInfo.groupId, '🎵 点歌服务暂时不可用，请稍后再试~', msgId, null, userInfo.openid); } catch (e2) {} return true; }
+}
 
 // 从聊天记录中查找被引用消息的内容
 function extractReferencedContent(botId, event, chatType, userInfo, groupId) {

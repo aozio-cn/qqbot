@@ -4,7 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>QQBot 管理平台</title>
-<link rel="stylesheet" href="/style.css">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<link rel="stylesheet" href="/style.css?v=9">
 </head>
 <body>
 
@@ -32,8 +35,10 @@
     <li class="sidebar-section-title">管理</li>
     <li><a class="active" onclick="showPage('bots')"><span class="menu-icon">&#129302;</span>机器人列表</a></li>
     <li><a onclick="showPage('chats')"><span class="menu-icon">&#128172;</span>聊天记录</a></li>
+    <li><a onclick="showPage('commands')"><span class="menu-icon">&#9881;</span>指令/菜单</a></li>
+    <li><a onclick="showPage('msgrecv')"><span class="menu-icon">&#128229;</span>消息接收方式</a></li>
+    <li><a onclick="showPage('music')"><span class="menu-icon">&#127925;</span>音乐接口</a></li>
     <li class="sidebar-section-title">操作</li>
-    <li><a onclick="openAddModal()"><span class="menu-icon">&#10133;</span>添加机器人</a></li>
     <li><a onclick="showPage('backup')"><span class="menu-icon">&#128190;</span>备份恢复</a></li>
   </ul>
   <div class="sidebar-footer">
@@ -74,14 +79,47 @@
       <div id="chatList" style="margin-top:10px;"></div>
     </div>
     <div class="card" id="chatDetailCard" style="display:none;">
-      <div class="card-title">
+      <div class="card-title" style="flex-wrap:wrap;row-gap:6px;">
         <span id="chatDetailTitle">对话详情</span>
-        <button class="btn btn-outline btn-sm" onclick="document.getElementById('chatDetailCard').style.display='none'">关闭</button>
+        <span style="display:inline-flex;gap:4px;flex-wrap:wrap;">
+          <button class="btn btn-outline btn-sm" onclick="document.getElementById('chatDetailCard').style.display='none'">关闭</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteCurrentChat()">删除</button>
+        </span>
       </div>
       <div id="chatDetail"></div>
     </div>
   </div>
 
+
+  <div id="page-commands" style="display:none;">
+    <div class="card">
+      <div class="card-title"><span>指令 / 菜单</span></div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>选择机器人</label>
+          <select id="cmdBotSelect" onchange="loadCmdConfig()"><option value="">请选择</option></select>
+        </div>
+      </div>
+      <div id="cmdConfig" style="margin-top:12px;"></div>
+      <div id="cmdMenuPreview" style="margin-top:16px;"></div>
+    </div>
+  </div>
+
+  <div id="page-msgrecv" style="display:none;">
+    <div class="card">
+      <div class="card-title"><span>消息接收方式</span></div>
+      <div style="font-size:12px;color:#999;margin-bottom:4px;">每个机器人必须设置一种接收方式，且只能设置一种（同一机器人两个方式互斥，勾选一个自动取消另一个）。</div>
+      <div id="msgRecvConfig" style="margin-top:12px;"></div>
+    </div>
+  </div>
+
+  <div id="page-music" style="display:none;">
+    <div class="card">
+      <div class="card-title"><span>音乐接口（点歌）</span></div>
+      <div style="font-size:12px;color:#999;margin-bottom:4px;">配置点歌功能的音乐平台与接口。网易云走第三方接口，一个接口不可用时可在下方切换预设或自定义填写。</div>
+      <div id="musicConfig" style="margin-top:12px;"></div>
+    </div>
+  </div>
 
   <div id="page-backup" style="display:none;">
     <div class="card">
@@ -126,24 +164,49 @@
           </div>
         </div>
       </div>
-      <div class="form-group">
-        <label>对话级提示词（人格设定）</label>
-        <textarea id="botPrompt" placeholder="机器人的人设、性格、对话风格" style="min-height:120px;"></textarea>
-        <div style="font-size:11px;color:#999;margin-top:4px;line-height:1.5;">系统级提示词（安全规则、时间戳、保密规则）已写死在代码中，不可修改。此处仅可编辑人格设定和对话风格。</div>
-      </div>
-      <div class="form-group">
-        <label>API地址</label>
-        <input type="text" id="botApiUrl" value="https://aapi.aozio.cn/api/relay.php">
-      </div>
-      <div class="form-row">
+      <div id="botConvFields">
         <div class="form-group">
-          <label>API Key</label>
-          <input type="text" id="botApiKey" value="sk-aapi-5d0e4cf82f7e4ac6e887ec8b3b1c4bb0">
+          <label>对话级提示词（人格设定）</label>
+          <textarea id="botPrompt" placeholder="机器人的人设、性格、对话风格" style="min-height:120px;"></textarea>
+          <div style="font-size:11px;color:#999;margin-top:4px;line-height:1.5;">系统级提示词（安全规则、时间戳、保密规则）已写死在代码中，不可修改。此处仅可编辑人格设定和对话风格。</div>
         </div>
         <div class="form-group">
-          <label>模型名称</label>
-          <input type="text" id="botModel" value="acu/deepseek-v4-flash">
+          <label>API地址</label>
+          <input type="text" id="botApiUrl" value="https://aapi.aozio.cn/api/relay.php">
         </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>API Key</label>
+            <input type="text" id="botApiKey" value="sk-aapi-5d0e4cf82f7e4ac6e887ec8b3b1c4bb0">
+          </div>
+          <div class="form-group">
+            <label>模型名称</label>
+            <input type="text" id="botModel" value="acu/deepseek-v4-flash">
+          </div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>功能开关</label>
+        <div class="check-group">
+          <label class="check-row"><input type="checkbox" id="botEnableConversation" onchange="toggleConvFields()"> <span>启用对话功能（AI聊天回复）</span></label>
+          <label class="check-row"><input type="checkbox" id="botEnableQuickCommands"> <span>启用快捷指令（输入“签到”“运势”等关键词触发）</span></label>
+          <label class="check-row"><input type="checkbox" id="botEnableBottomCommands"> <span>启用聊天底部指令（斜杠指令）</span></label>
+          <label class="check-row"><input type="checkbox" id="botAllowKeywordWake"> <span>群聊允许关键词唤醒（未@时提到机器人名字也回复）</span></label>
+          <label class="check-row"><input type="checkbox" id="botEnableVisionModel"> <span>启用视觉模型（收到图片时交给所填 API 处理）</span></label>
+          <label class="check-row"><input type="checkbox" id="botEnableVoiceModel"> <span>启用语音模型（收到语音时交给所填 API 处理）</span></label>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>机器人 OpenID（用于“艾特机器人判断”）</label>
+        <div class="form-row" style="align-items:center;">
+          <input type="text" id="botOpenidHex" placeholder="留空则需在群里@本机器人后自动提取" style="flex:1;" value="">
+          <button type="button" class="btn btn-primary btn-sm" onclick="pickOpenid()" style="white-space:nowrap;">自动提取</button>
+        </div>
+        <div style="font-size:11px;color:#999;margin-top:4px;line-height:1.5;">点击“自动提取”：到任意群中 @ 本机器人并随便发送一条内容（后面可跟几位数字便于识别），发送后回到这里点“确认”，系统会读取最近一次被@本机器人的 OpenID 填入上方输入框（也可手动修改），保存后即用于识别群内对本机器人的艾特。</div>
+      </div>
+      <div class="form-group">
+        <label>“关于”自定义内容（可选）</label>
+        <textarea id="botAboutContent" placeholder="设置后，发送“关于”/“你是谁”将显示此内容；留空则使用默认关于文案" style="min-height:80px;"></textarea>
       </div>
     </div>
     <div class="modal-footer">
@@ -154,249 +217,18 @@
 </div>
 
 <div class="toast" id="toast"></div>
-
-<script>
-var token=localStorage.getItem('token');
-if(!token){location.href='/login.html';}
-
-function api(path,opts){
-  opts=opts||{};
-  return fetch('/api'+path,Object.assign({},opts,{
-    headers:Object.assign({'Content-Type':'application/json','X-Auth-Token':token},opts.headers||{})
-  })).then(function(r){
-    if(r.status===401){localStorage.removeItem('token');location.href='/login.html';throw new Error('未登录');}
-    return r.json().then(function(d){return {ok:r.ok,d:d};});
-  });
-}
-
-function showToast(msg,type){
-  type=type||'success';
-  var t=document.getElementById('toast');
-  t.textContent=msg;t.className='toast '+type+' show';
-  setTimeout(function(){t.className='toast';},2500);
-}
-
-function esc(s){if(!s)return'';var d=document.createElement('div');d.textContent=s;return d.innerHTML;}
-
-function statusText(s){return {online:'在线',offline:'离线',connecting:'连接中',error:'错误'}[s]||s;}
-function statusClass(s){return {online:'badge-success',offline:'badge-secondary',connecting:'badge-warning',error:'badge-danger'}[s]||'badge-secondary';}
-
-function toggleSidebar(){
-  var d=document.getElementById('sidebarDrawer');
-  var o=document.getElementById('sidebarOverlay');
-  if(d.className.indexOf('active')>=0){d.className='sidebar-drawer';o.className='sidebar-overlay';}
-  else{d.className='sidebar-drawer active';o.className='sidebar-overlay active';}
-}
-
-function showPage(page){
-  document.getElementById('page-backup').style.display = (page==='backup') ? '' : 'none';
-  document.getElementById('page-bots').style.display=page==='bots'?'block':'none';
-  document.getElementById('page-chats').style.display=page==='chats'?'block':'none';
-  var links=document.querySelectorAll('.sidebar-menu a');
-  for(var i=0;i<links.length;i++)links[i].className='';
-  toggleSidebar();
-  if(page==='chats')loadChatBots();
-}
-
-function loadBots(){
-  api('/bots').then(function(res){
-    if(!res.ok)return;
-    var bots=res.d.bots||[];
-    var online=bots.filter(function(b){return b.status==='online';}).length;
-    var totalMsg=bots.reduce(function(s,b){return s+(b.msgCount||0);},0);
-    document.getElementById('stats').innerHTML=
-      '<div class="stat-card"><div class="stat-num">'+bots.length+'</div><div class="stat-label">机器人总数</div></div>'+
-      '<div class="stat-card"><div class="stat-num">'+online+'</div><div class="stat-label">在线</div></div>'+
-      '<div class="stat-card"><div class="stat-num">'+totalMsg+'</div><div class="stat-label">累计消息</div></div>';
-    var list=document.getElementById('botList');
-    if(bots.length===0){
-      list.innerHTML='<div class="empty"><p>还没有添加机器人</p><button class="btn btn-primary btn-sm" onclick="openAddModal()">添加第一个机器人</button></div>';
-      return;
-    }
-    list.innerHTML='<div class="bot-list">'+bots.map(function(b){
-      return '<div class="bot-card">'+
-        '<div class="bot-card-header"><div class="bot-card-name">'+esc(b.name)+'</div><span class="badge '+statusClass(b.status)+'">'+statusText(b.status)+'</span></div>'+
-        '<div class="bot-card-info">'+
-          '<div><span class="label">AppID:</span>'+esc(b.appId)+'</div>'+
-          '<div><span class="label">模型:</span>'+esc(b.model||'-')+'</div>'+
-          '<div><span class="label">消息:</span>'+(b.msgCount||0)+' 条 / '+(b.sessionCount||0)+' 会话</div>'+
-          (b.errorMsg?'<div style="color:#dc3545;font-size:10px;margin-top:4px;">'+esc(b.errorMsg.substring(0,60))+'</div>':'')+
-        '</div>'+
-        '<div class="bot-card-actions">'+
-          '<button class="btn btn-outline btn-sm" onclick="editBot(\''+b.id+'\')">编辑</button>'+
-          '<button class="btn btn-warning btn-sm" onclick="reconnectBot(\''+b.id+'\')">重连</button>'+
-          '<button class="btn btn-danger btn-sm" onclick="deleteBot(\''+b.id+'\',\''+esc(b.name)+'\')">删除</button>'+
-        '</div>'+
-      '</div>';
-    }).join('')+'</div>';
-  });
-}
-
-function openAddModal(){
-  document.getElementById('modalTitle').textContent='添加机器人';
-  document.getElementById('botId').value='';
-  document.getElementById('botName').value='';
-  document.getElementById('botAppId').value='';
-  document.getElementById('botAppSecret').value='';
-  document.getElementById('botPrompt').value='你是一个友好的AI助手。';
-  document.getElementById('botApiUrl').value='https://aapi.aozio.cn/api/relay.php';
-  document.getElementById('botApiKey').value='sk-aapi-5d0e4cf82f7e4ac6e887ec8b3b1c4bb0';
-  document.getElementById('botModel').value='acu/deepseek-v4-flash';
-  document.getElementById('modal').classList.add('active');
-}
-
-function editBot(id){
-  api('/bots/'+id).then(function(res){
-    if(!res.ok||!res.d.bot)return;
-    var b=res.d.bot;
-    document.getElementById('modalTitle').textContent='编辑机器人';
-    document.getElementById('botId').value=b.id;
-    document.getElementById('botName').value=b.name;
-    document.getElementById('botAppId').value=b.appId;
-    document.getElementById('botAppSecret').value=b.appSecret;
-    document.getElementById('botPrompt').value=b.systemPrompt;
-    document.getElementById('botApiUrl').value=b.apiUrl;
-    document.getElementById('botApiKey').value=b.apiKey;
-    document.getElementById('botModel').value=b.model;
-    document.getElementById('modal').classList.add('active');
-  });
-}
-
-function closeModal(){document.getElementById('modal').classList.remove('active');}
-
-function saveBot(){
-  var id=document.getElementById('botId').value;
-  var data={
-    name:document.getElementById('botName').value.trim(),
-    appId:document.getElementById('botAppId').value.trim(),
-    appSecret:document.getElementById('botAppSecret').value.trim(),
-    systemPrompt:document.getElementById('botPrompt').value,
-    apiUrl:document.getElementById('botApiUrl').value.trim(),
-    apiKey:document.getElementById('botApiKey').value.trim(),
-    model:document.getElementById('botModel').value.trim()
-  };
-  if(!data.name||!data.appId||!data.appSecret){showToast('名称、AppID、AppSecret必填','error');return;}
-  var url=id?'/bots/'+id:'/bots';
-  var method=id?'PUT':'POST';
-  api(url,{method:method,body:JSON.stringify(data)}).then(function(res){
-    if(res.ok){showToast(id?'修改成功':'添加成功');closeModal();loadBots();}
-    else{showToast(res.d.error||'操作失败','error');}
-  });
-}
-
-function reconnectBot(id){
-  api('/bots/'+id+'/reconnect',{method:'POST'}).then(function(res){
-    if(res.ok){showToast('正在重连...');setTimeout(loadBots,2000);}
-  });
-}
-
-function deleteBot(id,name){
-  if(!confirm('确定删除机器人「'+name+'」吗？此操作不可恢复。'))return;
-  api('/bots/'+id,{method:'DELETE'}).then(function(res){
-    if(res.ok){showToast('已删除');loadBots();}
-  });
-}
-
-function doLogout(){
-  api('/logout',{method:'POST'}).catch(function(){});
-  localStorage.removeItem('token');
-  location.href='/login.html';
-}
-
-function loadChatBots(){
-  api('/bots').then(function(res){
-    if(!res.ok)return;
-    var sel=document.getElementById('chatBotSelect');
-    sel.innerHTML='<option value="">请选择</option>'+res.d.bots.map(function(b){return '<option value="'+b.id+'">'+esc(b.name)+'</option>';}).join('');
-  });
-}
-
-function loadChatList(){
-  var botId=document.getElementById('chatBotSelect').value;
-  var type=document.getElementById('chatTypeSelect').value;
-  var list=document.getElementById('chatList');
-  if(!botId){list.innerHTML='<div class="empty"><p>请先选择机器人</p></div>';return;}
-  api('/bots/'+botId+'/chats?type='+type).then(function(res){
-    if(!res.ok){list.innerHTML='<div class="empty"><p>'+esc(res.d.error||'加载失败')+'</p></div>';return;}
-    var chats=res.d.chats||[];
-    if(chats.length===0){list.innerHTML='<div class="empty"><p>暂无聊天记录</p></div>';return;}
-    list.innerHTML=chats.map(function(c){
-      return '<div class="chat-record-item" onclick="loadChatDetail(\''+botId+'\',\''+type+'\',\''+esc(c.key)+'\',\''+esc(c.name)+'\')" style="cursor:pointer;">'+
-        '<div class="chat-record-meta"><span style="font-weight:600;color:#333;">'+esc(c.name)+'</span><span>'+c.count+' 条消息</span></div>'+
-        '<div class="chat-record-content" style="color:#888;font-size:11px;">'+esc(c.key)+'</div>'+
-      '</div>';
-    }).join('');
-  });
-}
-
-function loadChatDetail(botId,type,key,name){
-  document.getElementById('chatDetailTitle').textContent=name+' - 对话详情';
-  document.getElementById('chatDetailCard').style.display='block';
-  api('/bots/'+botId+'/chats/'+encodeURIComponent(key)+'?type='+type).then(function(res){
-    var detail=document.getElementById('chatDetail');
-    if(!res.ok){detail.innerHTML='<div class="alert alert-error">加载失败</div>';return;}
-    var msgs=res.d.messages||[];
-    if(msgs.length===0){detail.innerHTML='<div class="empty"><p>暂无消息</p></div>';return;}
-    detail.innerHTML=msgs.map(function(m){
-      return '<div class="chat-record-item">'+
-        '<div class="chat-record-meta"><span class="badge '+(m.role==='user'?'badge-info':'badge-success')+'">'+(m.role==='user'?'用户':'机器人')+'</span><span>'+(m.time||'')+'</span></div>'+
-        '<div class="chat-record-content '+(m.role==='user'?'user':'assistant')+'">'+esc(m.content)+'</div>'+
-      '</div>';
-    }).join('');
-  });
-}
-
-document.getElementById('modal').addEventListener('click',function(e){if(e.target.id==='modal')closeModal();});
-
-loadBots();
-setInterval(loadBots,15000);
-</script>
-<script>
-function toggleAppSecret() {
-  var input = document.getElementById('botAppSecret');
-  var btn = document.getElementById('appSecretEyeBtn');
-  if (input.type === 'password') {
-    input.type = 'text';
-    btn.innerHTML = '🙈';
-  } else {
-    input.type = 'password';
-    btn.innerHTML = '👁️';
-  }
-}
-</script>
-<script>
-function downloadBackup(){
-  var token = document.cookie.replace(/(?:(?:^|.*;)\s*token\s*\=\s*([^;]*).*$)|^.*$/, "$1");
-  // 用fetch带header下载
-  fetch('/api/backup')
-    .then(r => { if(!r.ok) throw new Error('下载失败'); return r.blob(); })
-    .then(b => {
-      var url = URL.createObjectURL(b);
-      var a = document.createElement('a');
-      a.href = url;
-      a.download = 'qqbot_backup_' + new Date().toISOString().slice(0,10) + '.zip';
-      a.click();
-      URL.revokeObjectURL(url);
-    }).catch(e => alert(e.message));
-}
-
-function restoreBackup(input){
-  if(!input.files[0]) return;
-  if(!confirm('恢复将覆盖当前所有数据，确定继续？')) return;
-  var f = input.files[0];
-  var reader = new FileReader();
-  reader.onload = function(){
-    fetch('/api/restore', {
-      method:'POST',
-      headers:{'Content-Type':'application/zip'},
-      body: new Uint8Array(reader.result)
-    }).then(r => r.json()).then(d => {
-      alert(d.success ? '恢复成功，3秒后重启服务...' : '失败: ' + (d.error||''));
-      if(d.success) setTimeout(function(){ location.reload(); }, 3000);
-    }).catch(e => alert('请求失败: ' + e.message));
-  };
-  reader.readAsArrayBuffer(f);
-}
-</script>
+<div id="pickOpenidMask" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.4);z-index:9999;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:10px;padding:22px 26px;min-width:280px;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,.2);">
+    <div style="font-size:16px;font-weight:700;margin-bottom:12px;">自动提取 OpenID</div>
+    <div style="font-size:13px;color:#555;margin-bottom:10px;line-height:1.5;">请到任意群中 @ 本机器人，输入以下 6 位数字并发送：</div>
+    <div id="pickTokenText" style="font-size:26px;font-weight:800;letter-spacing:3px;margin-bottom:12px;">------</div>
+    <div style="font-size:12px;color:#999;margin-bottom:16px;">发送后点击「确认」，系统将以这 6 位数字为标识，检查机器人接收到的近 10 条消息并提取该机器人的 OpenID。</div>
+    <div style="display:flex;gap:10px;justify-content:center;">
+      <button class="btn btn-outline btn-sm" onclick="pickOpenidCancel()">取消</button>
+      <button class="btn btn-primary btn-sm" onclick="pickOpenidConfirm()">确认</button>
+    </div>
+  </div>
+</div>
+<script src="/app.js?v=33"></script>
 </body>
 </html>
